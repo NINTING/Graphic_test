@@ -1,0 +1,137 @@
+#include <math.h>   // fmaxf(), sinf(), cosf()
+#include <stdlib.h> // abs()
+#include <string.h> // memset()
+#include<iostream>
+#include<fstream>
+#define PI 3.14159265359f
+#define W 512
+#define H 512
+#define R 1
+#define B 2
+#define L 4
+#define T 8
+using namespace std;
+
+static unsigned char img[W * H * 3];
+
+
+struct vertex{
+	int x,y;
+	vertex(){};
+	vertex(int x,int y):x(x),y(y){};
+};
+
+vertex lmin,lmax,rmin,rmax;
+void setpixel(int x, int y) {
+    unsigned char* p = img + (y * W + x) * 3;
+    p[0] = p[1] = p[2] = 0;
+}
+
+// Modified from  https://rosettacode.org/wiki/Bitmap/Bresenham%27s_line_algorithm#C
+void bresenham(int x0, int y0, int x1, int y1) {
+    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+
+    while (setpixel(x0, y0), x0 != x1 || y0 != y1) {
+        int e2 = err;
+        if (e2 > -dx) { err -= dy; x0 += sx; }
+        if (e2 <  dy) { err += dx; y0 += sy; }
+    }
+}
+void bresenham(const vertex &b,const vertex& e) {
+   int x0 = b.x, int y0 = b.y, int x1 = e.x, int y1=e.y;
+	int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+
+    while (setpixel(x0, y0), x0 != x1 || y0 != y1) {
+        int e2 = err;
+        if (e2 > -dx) { err -= dy; x0 += sx; }
+        if (e2 <  dy) { err += dx; y0 += sy; }
+    }
+}
+int Lx, Rx, Ty, By;
+int getcode(const vertex &v){
+	int p = 0;
+	if(v.x<Lx) p|=L;
+	if(v.y<By) p|=B;
+	if(v.y>Ty) p|=T;
+	if(v.x>Rx) p|=R;
+	return p;
+
+}
+
+void clip(int& code,vertex& v,const vertex &u){
+	if(code&L){
+		v.y = v.y+(u.y-v.y)*(Lx-v.x)/(u.x-v.x);
+		v.x =Lx;
+	}
+	else if(code&R){
+		v.y = v.y+(u.y-v.y)*(Rx-v.x)/(u.x-v.x);
+		v.x =Rx;
+	}
+	else if(code&T){
+		v.x = v.x+(u.x-v.x)*(Ty-v.y)/(u.y-v.y);
+		v.y =Ty;
+	}
+	else if(code&B){
+		v.x = v.x+(u.x-v.x)*(By-v.y)/(u.y-v.y);
+		v.y =By;
+	}
+	code = getcode(v);
+
+}
+
+void lineclip(vertex& a,vertex& b){
+
+//	int x0 = a.x, int y0 = a.y, int x1 = b.x, int y1=b.y;
+	int p1 = 0,p2 = 0;
+	p1 = getcode(a);p2 = getcode(b);
+	if(!p1&&!p2)return;
+	while(p1||p2){
+		if(p1&p2)return;
+		clip(p1,a,b);
+		clip(p2,b,a);
+	}
+}
+
+
+void draw(){
+	
+	ofstream fout("image1.ppm");
+	printf("‰÷»æ÷–\n");
+	fout<<"P3\n";
+	fout<<W<<" "<<H<<"\n";
+	fout<<"255\n";
+	int i,j;
+	for(i = H-1;i>=0;i--){
+		unsigned char* p = img + (i * W) * 3;
+		for(j = 0;j<W;j++,p+=3){
+			fout<<(int)p[0]<<" "<<(int)p[1]<<" "<<(int)p[2]<<"\n";
+		}
+	}
+	fout.close();
+
+}
+
+
+
+int main() {
+    memset(img, 255, sizeof(img));
+    //float cx = W * 0.5f - 0.5f, cy = H * 0.5f - 0.5f;
+	lmin = vertex(100,100);lmax = vertex(100,400);
+	rmin = vertex(400,100);rmax=vertex(400,400);
+	Lx = 0, Rx =W , Ty = H, By = 0;
+	bresenham(lmin,lmax);
+	bresenham(lmin,rmin);
+	bresenham(lmax,rmax);
+	bresenham(rmin,rmax);
+	
+	
+	vertex a(-20,-20),b(200,250);
+	lineclip(a,b);
+	bresenham(a,b);
+	draw();
+
+}
